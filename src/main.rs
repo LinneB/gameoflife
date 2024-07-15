@@ -1,35 +1,35 @@
-use std::env;
-
 use rand::{thread_rng, Rng};
 use raylib::prelude::*;
 
 #[derive(Clone)]
 struct Board {
-    size: u32,
+    width: u32,
+    height: u32,
     cells: Vec<bool>,
 }
 
 impl Board {
-    fn new(size: u32) -> Board {
+    fn new(width: u32, height: u32) -> Board {
         Board {
-            size,
-            cells: vec![false; (size * size) as usize],
+            width,
+            height,
+            cells: vec![false; (width * height) as usize],
         }
     }
     fn randomize_cells(&mut self) {
         let mut rng = thread_rng();
-        for x in 0..self.size {
-            for y in 0..self.size {
+        for x in 0..self.width {
+            for y in 0..self.height {
                 self.set_cell(x, y, rng.gen_bool(0.10));
             }
         }
     }
     fn tick(&mut self) -> u32 {
-        let mut cells: Vec<bool> = vec![false; (self.size * self.size) as usize];
+        let mut cells: Vec<bool> = vec![false; (self.width * self.height) as usize];
         let mut updated_cells = 0;
-        for x in 0..self.size {
-            for y in 0..self.size {
-                let index = get_index(self.size, x, y);
+        for x in 0..self.width {
+            for y in 0..self.height {
+                let index = get_index(self.width, x, y);
                 let cell_alive = self.cells[index];
                 let neighbours = self.get_neighbours(x, y);
 
@@ -58,13 +58,13 @@ impl Board {
         updated_cells
     }
     fn get_cell(&self, x: u32, y: u32) -> bool {
-        if x >= self.size || y >= self.size {
+        if x >= self.width || y >= self.height {
             return false;
         }
-        self.cells[get_index(self.size, x, y)]
+        self.cells[get_index(self.width, x, y)]
     }
     fn set_cell(&mut self, x: u32, y: u32, alive: bool) {
-        self.cells[get_index(self.size, x, y)] = alive;
+        self.cells[get_index(self.width, x, y)] = alive;
     }
     fn get_neighbours(&self, x: u32, y: u32) -> u32 {
         let mut neighbours = 0;
@@ -94,20 +94,16 @@ fn get_index(width: u32, x: u32, y: u32) -> usize {
 }
 
 fn main() {
-    let mut board_size = 1000;
-    let args: Vec<String> = env::args().collect();
-    if let Some(size) = args.get(1) {
-        if let Ok(size_u32) = size.parse::<u32>() {
-            board_size = size_u32;
-        }
-    }
-    let mut board = Board::new(board_size);
-
     let (mut rl, thread) = raylib::init().title("Game of Life").resizable().build();
     rl.set_target_fps(60);
 
+    let mut board = Board::new(
+        rl.get_screen_width() as u32 / 2,
+        rl.get_screen_height() as u32 / 2,
+    );
+
     let mut camera = Camera2D {
-        target: Vector2::new(board_size as f32 * 0.5, board_size as f32 * 0.5),
+        target: Vector2::new(board.width as f32 * 0.5, board.height as f32 * 0.5),
         offset: Vector2::new(rl.get_screen_width() as f32, rl.get_screen_height() as f32),
         rotation: 0.0,
         zoom: 1.0,
@@ -126,30 +122,46 @@ fn main() {
         }
 
         camera.zoom = min(
-            d.get_screen_width() as f32 / board.size as f32,
-            d.get_screen_height() as f32 / board.size as f32,
+            d.get_screen_width() as f32 / board.width as f32,
+            d.get_screen_height() as f32 / board.height as f32,
         );
 
         if d.is_key_pressed(KeyboardKey::KEY_R) {
+            board.width = d.get_screen_width() as u32 / 2;
+            board.height = d.get_screen_height() as u32 / 2;
+            board.cells = vec![false; (board.width * board.height) as usize];
+            camera.target = Vector2::new(board.width as f32 * 0.5, board.height as f32 * 0.5);
             board.randomize_cells();
             continue;
         }
 
         d.clear_background(Color::BLACK);
 
-        for x in 0..board.size {
-            for y in 0..board.size {
+        for x in 0..board.width {
+            for y in 0..board.height {
                 if board.get_cell(x, y) {
                     d.draw_pixel(x as i32, y as i32, Color::WHITE);
                 }
             }
         }
 
+        if d.get_time() < 5.0 {
+            let text = "Press R to reload cells";
+            let w = d.measure_text(text, 5);
+            d.draw_text(
+                text,
+                board.width as i32 / 2 - w / 2,
+                board.height as i32 / 2 - 10,
+                5,
+                Color::GRAY,
+            );
+        }
+
         // Only calculate a new generation every other frame
         // This is so resizing the window is nice and smooth, without making the simulation too fast
         if should_tick {
             let updated_cells = board.tick();
-            if board.size.pow(2) / 100 > updated_cells {
+            if board.width * board.height / 100 > updated_cells {
                 // Reset cells if >1% of individual cells have updated
                 board.randomize_cells();
             }
