@@ -124,6 +124,8 @@ fn main() {
     };
 
     let mut should_tick = false;
+    let mut is_paused = false;
+
     while !rl.window_should_close() {
         let mut bd = rl.begin_drawing(&thread);
         let mut d = bd.begin_mode2D(camera);
@@ -139,6 +141,13 @@ fn main() {
             d.get_screen_width() as f32 / board.width as f32,
             d.get_screen_height() as f32 / board.height as f32,
         );
+
+        if d.is_key_pressed(KeyboardKey::KEY_SPACE) {
+            is_paused = !is_paused
+        }
+        if d.is_key_pressed(KeyboardKey::KEY_TAB) && is_paused {
+            board.tick();
+        }
 
         if d.is_key_pressed(KeyboardKey::KEY_R) || d.is_window_resized() {
             board.width = d.get_screen_width() as u32 / 2;
@@ -174,7 +183,7 @@ fn main() {
 
         // Only calculate a new generation every other frame
         // This is so resizing the window is nice and smooth, without making the simulation too fast
-        if should_tick {
+        if should_tick && !is_paused {
             let updated_cells = board.tick();
             if board.width * board.height / 100 > updated_cells {
                 // Reset cells if >1% of individual cells have updated
