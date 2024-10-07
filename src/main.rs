@@ -5,7 +5,7 @@ use raylib::prelude::*;
 struct Board {
     width: u32,
     height: u32,
-    cells: Vec<bool>,
+    cells: Vec<u8>,
 }
 
 impl Board {
@@ -13,42 +13,44 @@ impl Board {
         Board {
             width,
             height,
-            cells: vec![false; (width * height) as usize],
+            cells: vec![0; (width * height) as usize],
         }
     }
     fn randomize_cells(&mut self) {
         let mut rng = thread_rng();
         for x in 0..self.width {
             for y in 0..self.height {
-                self.set_cell(x, y, rng.gen_bool(0.10));
+                if rng.gen_bool(0.10) {
+                    self.set_cell(x, y, 1);
+                }
             }
         }
     }
     fn tick(&mut self) -> u32 {
-        let mut cells: Vec<bool> = vec![false; (self.width * self.height) as usize];
+        let mut cells: Vec<u8> = vec![0; (self.width * self.height) as usize];
         let mut updated_cells = 0;
         for x in 0..self.width {
             for y in 0..self.height {
                 let index = get_index(self.width, x, y);
-                let cell_alive = self.cells[index];
+                let cell = self.cells[index];
                 let neighbours = self.get_neighbours(x, y);
 
-                if cell_alive && neighbours < 2 {
-                    cells[index] = false;
+                if cell > 0 && neighbours < 2 {
+                    cells[index] = 0;
                     updated_cells += 1;
                     continue;
                 }
-                if cell_alive && neighbours <= 3 {
-                    cells[index] = true;
+                if cell > 0 && neighbours <= 3 {
+                    cells[index] = min(cell + 1, 6);
                     continue;
                 }
-                if cell_alive && neighbours > 3 {
-                    cells[index] = false;
+                if cell > 0 && neighbours > 3 {
+                    cells[index] = 0;
                     updated_cells += 1;
                     continue;
                 }
-                if !cell_alive && neighbours == 3 {
-                    cells[index] = true;
+                if cell == 0 && neighbours == 3 {
+                    cells[index] = 1;
                     updated_cells += 1;
                     continue;
                 }
@@ -57,14 +59,14 @@ impl Board {
         self.cells = cells;
         updated_cells
     }
-    fn get_cell(&self, x: u32, y: u32) -> bool {
+    fn get_cell(&self, x: u32, y: u32) -> u8 {
         if x >= self.width || y >= self.height {
-            return false;
+            return 0;
         }
         self.cells[get_index(self.width, x, y)]
     }
-    fn set_cell(&mut self, x: u32, y: u32, alive: bool) {
-        self.cells[get_index(self.width, x, y)] = alive;
+    fn set_cell(&mut self, x: u32, y: u32, cell: u8) {
+        self.cells[get_index(self.width, x, y)] = cell;
     }
     fn get_neighbours(&self, x: u32, y: u32) -> u32 {
         let mut neighbours = 0;
@@ -73,7 +75,7 @@ impl Board {
                 if i == x && j == y {
                     continue;
                 }
-                if self.get_cell(i, j) {
+                if self.get_cell(i, j) > 0 {
                     neighbours += 1;
                 }
             }
@@ -91,6 +93,18 @@ fn min<T: PartialOrd>(x: T, y: T) -> T {
 
 fn get_index(width: u32, x: u32, y: u32) -> usize {
     (y * width + x) as usize
+}
+
+fn get_color(cell: u8) -> Color {
+    match cell {
+        1 => Color::RED,
+        2 => Color::ORANGERED,
+        3 => Color::ORANGE,
+        4 => Color::YELLOW,
+        5 => Color::DARKGRAY,
+        6 => Color::GRAY,
+        _ => Color::BLACK,
+    }
 }
 
 fn main() {
@@ -126,10 +140,10 @@ fn main() {
             d.get_screen_height() as f32 / board.height as f32,
         );
 
-        if d.is_key_pressed(KeyboardKey::KEY_R) {
+        if d.is_key_pressed(KeyboardKey::KEY_R) || d.is_window_resized() {
             board.width = d.get_screen_width() as u32 / 2;
             board.height = d.get_screen_height() as u32 / 2;
-            board.cells = vec![false; (board.width * board.height) as usize];
+            board.cells = vec![0; (board.width * board.height) as usize];
             camera.target = Vector2::new(board.width as f32 * 0.5, board.height as f32 * 0.5);
             board.randomize_cells();
             continue;
@@ -139,8 +153,9 @@ fn main() {
 
         for x in 0..board.width {
             for y in 0..board.height {
-                if board.get_cell(x, y) {
-                    d.draw_pixel(x as i32, y as i32, Color::WHITE);
+                let cell = board.get_cell(x, y);
+                if cell > 0 {
+                    d.draw_pixel(x as i32, y as i32, get_color(cell));
                 }
             }
         }
