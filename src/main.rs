@@ -1,4 +1,3 @@
-use rand::{thread_rng, Rng};
 use raylib::prelude::*;
 
 #[derive(Clone)]
@@ -17,10 +16,9 @@ impl Board {
         }
     }
     fn randomize_cells(&mut self) {
-        let mut rng = thread_rng();
         for x in 0..self.width {
             for y in 0..self.height {
-                if rng.gen_bool(0.10) {
+                if fastrand::u8(0..10) == 0 {
                     self.set_cell(x, y, 1);
                 }
             }
